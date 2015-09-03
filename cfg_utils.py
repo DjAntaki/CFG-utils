@@ -128,7 +128,7 @@ def quickprompt():
     print("Terminal symbols : " + str(list(terminals)))
 
     while True:
-        x = raw_input("Input starting symbol :")
+        x = input("Input starting symbol :")
         if x in nonterminals and len(x) == 1:
             start = grammar.Nonterminal(x)
             break
@@ -154,7 +154,7 @@ def _rules_input_prompt(nonterminals, terminals):
     grammar_rules = []
     while (True):
         try:
-            x = raw_input()
+            x = input()
             if x == '':
                 break
             elif '->' in x:
