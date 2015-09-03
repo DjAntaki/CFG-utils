@@ -3,7 +3,17 @@ from nltk import ChartParser
 from itertools import product
 from nltk import grammar
 
-def all_accepted_under(cfg, length):
+"""
+Some functions to quickly use nltk to create and test context-free grammars.
+
+To see the functions associated with nltk.grammar.CFG :
+htt://www.nltk.org/api/nltk.html#nltk.grammar.CFG
+
+"""
+#
+# Functions to test accepted words
+#
+def accepted_under(cfg, length):
     """
     Returns a list of every accepted word of a context-free grammar under a given length.
     cfg : a nltk.grammar.CFG instance. 
@@ -19,7 +29,7 @@ def all_accepted_under(cfg, length):
     return accepted
 
 
-def accepted_lenght(cfg, x):
+def accepted_length(cfg, x):
     """
     Returns a list of every accepted word of a context-free grammar with a specific length
     """
@@ -32,6 +42,53 @@ def accepted_lenght(cfg, x):
     return accepted
 
 
+def _recognizes(parser, word):
+    """
+    Returns True if the CFG accepts that word and False if it doesnt.
+
+    parser : a nltk.parser instance for a cfg.
+    word : a list of tokens
+    """
+    if len(list(parser.parse(word))) > 0:
+        return True
+    return False
+
+
+def recognizes(cfg, word):
+    """
+    cfg : a nltk.grammar.CFG instance
+    word : a string with tokens separated with spaces.
+
+    A parser is created at every call of this function.
+    """
+    return _recognizes(ChartParser(cfg), word.split())
+
+def recognizesAll(cfg, words):
+    """
+    Returns a list of boolean values corresponding to [recognizes(cfg,w) for w in words].
+    cfg : a nltk.grammar.CFG instance
+    words must be a list of string with tokens separated with spaces.
+
+    """
+    r = []
+    parser = ChartParser(cfg)
+    for word in words:
+        r.append(_recognizes(parser, word.split()))
+    return r
+
+def language_equals_under(cfg1, cfg2, length):
+    """
+    Compares all accepted words under a given length accepted by context-free grammar 1 and context-free grammar 2.
+
+    cfg1 & cfg2 : nltk.grammar.CFG instances
+    :return True if the they accept the same words, False if they do not.
+
+    """
+    return accepted_under(cfg1,length) == accepted_under(cfg2,length)
+
+#
+#   Administrative-ish function
+#
 
 def _get_terminal_symbols(cfg):
     """
@@ -52,47 +109,84 @@ def load_grammar(path):
     return pickle.load(open(path, 'rb'))
 
 
-def _recognizes(parser, word):
+#
+# Prompt and prompt-related functions
+#
+
+def quickprompt():
     """
-    Returns True if the CFG accepts that word and False if it doesnt.
-    
-    parser : a nltk.parser instance for a cfg.
-    word : a list of tokens
+    Interactive prompt to create a context-free grammar.
+
+    This prompt assumes that the non-terminal symbols is the uppercase alphabet and that the terminal symbols is lowercase alphabet. You only input rules and starting state.
     """
-    if len(list(parser.parse(word))) > 0:
-        return True
-    return False
+    from string import ascii_lowercase, ascii_uppercase
+
+    nonterminals = ascii_uppercase
+    terminals = ascii_lowercase
+
+    print("Non-terminal symbols : " + str(list(nonterminals)))
+    print("Terminal symbols : " + str(list(terminals)))
+
+    while True:
+        x = raw_input("Input starting symbol :")
+        if x in nonterminals and len(x) == 1:
+            start = grammar.Nonterminal(x)
+            break
+        else:
+            print('Incorrect input.')
+
+    grammar_rules = _rules_input_prompt(nonterminals, terminals)
+    return grammar.CFG(start, grammar_rules)
 
 
-def recognizes(cfg, word):
+def _rules_input_prompt(nonterminals, terminals):
     """
-    cfg : a nltk.grammar.CFG instance
-    word : a string with tokens separated with spaces.
-    
-    A parser is created at every call of this function.
+    Given a list of nonterminals and a list of terminals, this function creates a list of rules
+    (aka grammar.Production instances) and returns it. There must be a whitespace between all terminals and nonterminals symbols. Extra whitespaces are ignored/conside.
     """
-    return _recognizes(ChartParser(cfg), word.split())
+    print("You will now enter the rules of the grammar.")
+    print("Rule must be respect the following format : "
+          "\n 1. the two characters \"->\" are used for separating the right hand side from the left hand side"
+          "\n 2. There must be a whitespace between all symbols in the grammar (including non-terminals)"
+          "\n 3. The character \'|\' means \"or\" "
+          "\n ex. A -> b c|A b|d")
+    print("Press enter when you are done.")
+    grammar_rules = []
+    while (True):
+        try:
+            x = raw_input()
+            if x == '':
+                break
+            elif '->' in x:
 
-def recognizesAll(cfg, words):
-    """
-    Returns a list of boolean values corresponding to [recognizes(cfg,w) for w in words].  
-    cfg : a nltk.grammar.CFG instance
-    words must be a list of string with tokens separated with spaces.
-    
-    """
-    r = []
-    parser = ChartParser(cfg)
-    for word in words:
-        r.append(_recognizes(parser, word.split())
-    return r
+                y = x.split('->')
+                left_hand_side = y[0].replace(' ', '')
 
-def language_equals_under(cfg1, cfg2, length):
-    """
-    Compares accepted words under a given length accepted by context-free grammar 1 and context-free grammar 2. 
-    
-    cfg1 & cfg2 : nltk.grammar.CFG instances
-    :return True if the they accept the same words, False if they do not.
-    
-    """
-    return accepted_under_length_x(cfg1,length) == accepted_under_length_x(cfg2,length)
+                assert len(y) == 2
+                assert left_hand_side in nonterminals
+                left_hand_side = grammar.Nonterminal(left_hand_side)
+                y[1] = y[1].split('|')
+                for rhs in y[1]:
+                    right_hand_side = []
+                    for y in rhs.split(' '):
+                        if y != '':
+                            if y in nonterminals:
+                                right_hand_side.append(grammar.Nonterminal(y))
 
+
+                            elif y in terminals:
+                                right_hand_side.append(y)
+                            else:
+                                print(y + " is not a valid input.")
+                                raise Exception
+
+                    grammar_rules.append(grammar.Production(left_hand_side, right_hand_side))
+            else:
+                print("Invalid input. no \'->\'  in the input.")
+                raise Exception
+
+        except Exception as e:
+            print("Invalid Input.")
+            pass
+
+    return grammar_rules
